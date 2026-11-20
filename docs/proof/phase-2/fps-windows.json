@@ -1,0 +1,23 @@
+{
+  "platform": "Windows",
+  "python": "3.11.9",
+  "night": 3,
+  "window_px": [
+    1280,
+    720
+  ],
+  "canvas_px": [
+    1280,
+    635
+  ],
+  "duration_s": 5.02,
+  "frames": 154,
+  "fps": 30.68,
+  "simulation_steps": 301,
+  "input": [
+    "w",
+    "right"
+  ],
+  "audio": "muted",
+  "pause_resume_button": "passed"
+}

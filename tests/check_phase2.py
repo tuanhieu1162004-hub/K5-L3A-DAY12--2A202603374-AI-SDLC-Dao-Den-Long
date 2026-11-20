@@ -89,15 +89,49 @@ class PhaseTwo(unittest.TestCase):
         x, _, z = wind[2100]["player"]["pos"]
         self.assertAlmostEqual(math.hypot(x, z), 10, places=2)
 
-    def test_win_score_and_performance(self):
+    def test_dawn_score_and_performance(self):
         proof = ROOT / "docs/proof/phase-1"
         scenario = json.loads((proof / "final-lantern.json").read_text())
+        scenario["time_left_s"] = 3 / 60
+        scenario["lanterns"][4]["deposited"] = 8
         rows = run_night(1, 10, scenario, [{"tick": 0, "interact": True}])
-        self.assertEqual(rows[-1], {"type": "end", "ticks": 1, "state": "won", "score": 868})
+        self.assertEqual(snapshots(rows)[1]["state"], "playing")
+        self.assertEqual(rows[-1], {"type": "end", "ticks": 3, "state": "won", "score": 1005})
         start = time.monotonic()
         rows = run_night(3, 21600, {"time_left_s": 360, "wind_enabled": False}, interval=300)
         self.assertEqual(rows[-1]["ticks"], 21600)
         self.assertLess(time.monotonic() - start, 30)
+
+    def test_out_relight_and_capacity(self):
+        scenario = {"player":{"carried":5}, "lanterns":[{"id":"L1","pos":[0,0,0],"lit":True,"fuel":1/60}]}
+        rows = run_night(1, 1, scenario, [{"tick":0,"interact":True}])
+        self.assertEqual([r["name"] for r in rows if r["type"]=="event"],
+                         ["night_start","lantern_out","deposit","lantern_lit"])
+        snap = snapshots(rows)[1]
+        self.assertEqual(snap["player"]["capacity"], 12)
+        self.assertEqual(snap["lanterns"][0]["fuel"], 100)
+        self.assertEqual(snap["lanterns"][0]["relit_count"], 1)
+        self.assertEqual(snap["score"], 65)
+
+    def test_drain_and_refuel(self):
+        scenario = {"lanterns":[{"id":"L1","pos":[10,0,0],"lit":True,"fuel":29}],
+                    "shades":[{"pos":[10,1,0],"state":"wander"}]}
+        rows = run_night(1, 61, scenario, interval=61)
+        drain = next(r for r in rows if r.get("name")=="fuel_drain")
+        self.assertEqual((drain["tick"], drain["data"]["fuel"]), (61, 23.0))
+        scenario["player"] = {"pos":[8,0,0],"carried":1}
+        scenario["shades"][0].update(state="drain", target_lantern_id="L1")
+        rows = run_night(1, 1, scenario, [{"tick":0,"interact":True}])
+        snap = snapshots(rows)[1]
+        self.assertEqual(snap["shades"][0]["state"], "recoil")
+        self.assertEqual(snap["score"], 5)
+        self.assertTrue(any(r.get("name")=="refuel" for r in rows))
+
+    def test_dawn_prioritizes_no_flames(self):
+        rows = run_night(1, 1, {"time_left_s":1/60, "player":{"flames":1},
+                                "shades":[{"pos":[0,1,0]}],
+                                "lanterns":[{"id":f"L{i}","lit":True} for i in range(1,6)]})
+        self.assertEqual(next(r["data"]["reason"] for r in rows if r.get("name")=="game_over"), "no_flames")
 
 
 if __name__ == "__main__":

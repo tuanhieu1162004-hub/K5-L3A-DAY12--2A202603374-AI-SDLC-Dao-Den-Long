@@ -30,3 +30,5 @@ Tiêu chí dưới đây dựa trên phần Ticket-02 đã nhận. Cần đối 
 Chạy `python3 tests/check_phase2.py` (Windows dùng `python`). Bộ kiểm tra gọi CLI thật để kiểm tra ba bản đồ, cầu và bục, rơi, pause, lướt với bùa, Gió Lạc, gió Đêm 3, điểm thắng và phép đo 21.600 tick trong kịch bản kiểm soát.
 
 Đêm 2 và 3 hiện khai báo thời lượng tạm 300 giây. Bài đo 21.600 tick ghi đè thời lượng thành 360 giây và tắt sinh thực thể để đo được đủ số bước. Chưa kiểm tra bộ test ẩn hoặc đối chiếu bảng màu.
+
+[Số đo FPS trên Windows](proof/phase-2/fps-windows.json) ghi một đoạn chơi 5 giây ở Đêm 3, dùng vòng lặp Tkinter bình thường với thao tác đi và xoay camera. Cửa sổ là 1280×720, vùng vẽ là 1280×635 vì HUD và điều khiển nằm bên dưới. Ca thử tắt tiếng và đạt 30,68 FPS, đồng thời xác nhận nút Tiếp tục hoạt động. Cần đo lại ở độ phân giải vùng vẽ đầy đủ và trên macOS hoặc Linux.

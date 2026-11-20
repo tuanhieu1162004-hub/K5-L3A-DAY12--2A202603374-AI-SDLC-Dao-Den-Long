@@ -2,21 +2,25 @@
 
 ## Chạy Đêm 1 – Đảo Bến
 
-Cần Python 3.10+ có Tkinter. Trên Linux, nếu thiếu Tkinter, cài gói
-Tk của bản Python đang dùng (ví dụ `python3-tk` trên Debian/Ubuntu).
+Cần Python 3.10+ và môi trường đồ họa hỗ trợ Panda3D.
 
 ```sh
-python3 src/game.py
+python3 -m pip install -r requirements-render.txt
+python3 src/panda_game.py
 ```
 
 Trên Windows dùng `python` thay cho `python3`. Dùng WASD để di chuyển,
-←/→ để xoay camera, Space để nhảy, E để nạp đèn và Q để tỏa sáng.
-Thắp đủ 5 đèn để thắng. Hết máu hoặc hết thời gian sẽ thua. Bấm **Chơi lại**
-ở màn kết quả để bắt đầu lại.
+←/→ để xoay camera, Space để nhảy, Shift để lướt, E để nạp đèn và Q để tỏa sáng.
+Giữ ít nhất 60% số đèn sáng cho tới bình minh và còn Ngọn Lửa để thắng.
+Đèn cháy sẽ hao dầu. Dùng E để châm dầu hoặc thắp lại và dùng F2 để đổi bảng màu.
+Bấm **Chơi lại**
+ở màn kết quả để bắt đầu lại. Bản giao diện Tkinter vẫn mở được bằng
+`python3 src/game.py`. Headless chạy bằng thư viện chuẩn Python.
 
-Nhánh hiện tại áp dụng cách tính điểm Phase 2: 10 điểm mỗi đom đóm nạp,
-100 điểm mỗi đèn thắp, 5 điểm mỗi Bóng Mực trúng pulse. Khi thắng, cộng
-2 điểm cho mỗi giây nguyên còn lại và 50 điểm mỗi Ngọn Lửa còn lại.
+Phase 3 cộng 5 điểm mỗi đom đóm nạp, 100 điểm thắp lần đầu, 40 điểm
+thắp lại, và 5 hoặc 15 điểm mỗi Bóng Mực trúng pulse tùy trạng thái.
+Ở bình minh, mỗi đèn sáng cộng 50 điểm cộng phần nguyên nhiên liệu,
+và mỗi Ngọn Lửa còn lại cộng 50 điểm nếu thắng.
 Dùng Esc/P để tạm dừng hoặc tiếp tục. Ra khỏi mép đảo có thể làm Mây
 mất một Ngọn Lửa và quay lại điểm xuất phát.
 
@@ -28,8 +32,8 @@ python3 src/headless.py --seed 42 --night 1 --scenario docs/proof/phase-1/empty-
 
 Xem [ghi chép Phase 1](docs/proof/phase-1/notes.md) và
 [đầu ra mẫu tại tag Phase 1](docs/proof/phase-1/jump.jsonl).
-Ở nhánh hiện tại, Contract v1.1 bổ sung trường và sự kiện so với mẫu Phase 1.
-Để chạy kiểm chứng Phase 2, dùng `python3 tests/check_phase2.py`.
+Contract v1.2 bổ sung trường và sự kiện so với mẫu Phase 1.
+Để chạy kiểm chứng Phase 2–3, dùng `python3 tests/check_phase2.py`.
 Xem [spec Phase 2](docs/phase-2-spec.md) để biết các giá trị đang dùng tạm.
 
 > **Cá nhân** (1 người / 1 MSSV) · Áp dụng SDLC cùng AI để xây một **game 3D** qua **4 phase**, từ yêu cầu ban đầu tới bản phát hành.

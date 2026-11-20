@@ -11,7 +11,7 @@ from night_maps import LANTERNS, MOTE_POINTS, PADS, SHADE_POINTS, ground_levels
 
 
 TICKS_PER_SECOND = 60
-SHADE_STATES = ("spawning", "wander", "chase", "recoil", "stunned")
+SHADE_STATES = ("spawning", "wander", "chase", "recoil", "stunned", "drain")
 JUMP_SPEED = 6
 GRAVITY = 18
 CONTRACT_PATH = Path(__file__).resolve().parents[1] / "game.contract.json"
@@ -57,13 +57,15 @@ def initial_state(scenario, seed, tuning, night=1):
         "pos": position(player_data.get("pos", [0, 0, 0])),
         "flames": count(player_data.get("flames", tuning["flames"])),
         "carried": count(player_data.get("carried", 0)),
+        "successful_lights": count(player_data.get("successful_lights", 0)),
     }
     player_timers = {
         key: count(player_data.get(key, 0))
         for key in ("invuln_ticks", "dash_cd_ticks", "pulse_cd_ticks", "charm_ticks")
     }
     lanterns = {
-        f"L{index}": {"id": f"L{index}", "pos": list(point), "lit": False, "deposited": 0}
+        f"L{index}": {"id": f"L{index}", "pos": list(point), "lit": False, "deposited": 0,
+                     "fuel": 0, "ever_lit": False, "relit_count": 0}
         for index, point in enumerate(LANTERNS[night], start=1)
     }
     for update in objects(scenario.get("lanterns", [])):
@@ -79,6 +81,14 @@ def initial_state(scenario, seed, tuning, night=1):
             if type(update["lit"]) is not bool:
                 raise ValueError("lantern lit must be a boolean")
             lantern["lit"] = update["lit"]
+        fuel = update.get("fuel", tuning["fuel_max"] if lantern["lit"] else 0)
+        if not finite_number(fuel) or not 0 <= fuel <= tuning["fuel_max"]:
+            raise ValueError("invalid lantern fuel")
+        ever_lit = update.get("ever_lit", lantern["lit"])
+        if type(ever_lit) is not bool:
+            raise ValueError("ever_lit must be a boolean")
+        lantern["ever_lit"] = lantern["lit"] or ever_lit
+        lantern["fuel"] = round(fuel * TICKS_PER_SECOND) if lantern["lit"] else 0
 
     for flag in ("random_motes", "random_shades", "random_drifters", "wind_enabled"):
         if flag in scenario and type(scenario[flag]) is not bool:
@@ -116,7 +126,11 @@ def initial_state(scenario, seed, tuning, night=1):
         state = shade.get("state", "chase")
         if state not in SHADE_STATES:
             raise ValueError("unknown shade state")
+        target = shade.get("target_lantern_id")
+        if target is not None and (not isinstance(target, str) or target not in lanterns):
+            raise ValueError("invalid shade target lantern id")
         shades.append({"id": shade_id, "pos": position(shade.get("pos")), "state": state,
+                       "target_lantern_id": target, "drain_ticks": 0,
                        "state_until": 1 + count(shade.get("state_ticks_left", 0))})
 
     duration = scenario.get("time_left_s", tuning[f"night{night}_duration_s"])
@@ -151,13 +165,17 @@ def rounded_entity(entity):
     return {**entity, "pos": [round(value, 3) for value in entity["pos"]]}
 
 
+def capacity(player, tuning):
+    return min(tuning["capacity_max"], tuning["carry_capacity"] + 2 * player["successful_lights"])
+
+
 def collect_motes(output, tick, player, motes, tuning):
     remaining = []
     x, _, z = player["pos"]
     for mote in motes:
         mote_x, _, mote_z = mote["pos"]
         distance = math.hypot(mote_x - x, mote_z - z)
-        if player["carried"] < tuning["carry_capacity"] and distance <= tuning["pickup_radius"]:
+        if player["carried"] < capacity(player, tuning) and distance <= tuning["pickup_radius"]:
             player["carried"] += 1
             write_record(
                 output, type="event", tick=tick, name="mote_picked",
@@ -168,23 +186,30 @@ def collect_motes(output, tick, player, motes, tuning):
     return remaining
 
 
-def deposit_light(output, tick, player, lanterns, tuning):
-    x, _, z = player["pos"]
-    nearest = None
-    nearest_distance = math.inf
-    cost = tuning["lantern_cost"]
-    for lantern in lanterns:
-        if lantern["lit"] or lantern["deposited"] >= cost:
-            continue
-        lantern_x, _, lantern_z = lantern["pos"]
-        distance = math.hypot(lantern_x - x, lantern_z - z)
-        if distance <= tuning["interact_radius"] and distance < nearest_distance:
-            nearest, nearest_distance = lantern, distance
-
-    if nearest is None or player["carried"] == 0:
+def deposit_light(output, tick, sim_tick, player, lanterns, shades, tuning):
+    maximum = tuning["fuel_max"] * TICKS_PER_SECOND
+    candidates = [entry for entry in lanterns if not entry["lit"] or entry["fuel"] < maximum]
+    nearest = min(candidates, key=lambda entry: (ground_distance(player["pos"], entry["pos"]), entry["id"]),
+                  default=None)
+    if nearest is None or player["carried"] == 0 or ground_distance(player["pos"], nearest["pos"]) > tuning["interact_radius"]:
         return 0
 
-    amount = min(player["carried"], cost - nearest["deposited"])
+    threshold = tuning["low_fuel_threshold"] * TICKS_PER_SECOND
+    if nearest["lit"]:
+        previous = nearest["fuel"]
+        per_mote = tuning["fuel_per_mote"] * TICKS_PER_SECOND
+        amount = min(player["carried"], math.ceil((maximum - previous) / per_mote))
+        player["carried"] -= amount
+        nearest["fuel"] = min(maximum, previous + amount * per_mote)
+        if previous < threshold <= nearest["fuel"]:
+            repel_shades(nearest, shades, sim_tick)
+        write_record(output, type="event", tick=tick, name="refuel",
+                     data={"lantern_id": nearest["id"], "amount": amount, "fuel": displayed_fuel(nearest)})
+        return amount * tuning["score"]["per_mote"]
+
+    relight = nearest["ever_lit"]
+    cost = tuning["relight_cost"] if relight else tuning["lantern_cost"]
+    amount = min(player["carried"], max(0, cost - nearest["deposited"]))
     player["carried"] -= amount
     nearest["deposited"] += amount
     write_record(
@@ -195,12 +220,46 @@ def deposit_light(output, tick, player, lanterns, tuning):
     if nearest["deposited"] < cost:
         return points
 
-    nearest["lit"] = True
+    nearest.update(lit=True, ever_lit=True, fuel=maximum)
+    nearest["relit_count"] += int(relight)
+    player["successful_lights"] += 1
+    repel_shades(nearest, shades, sim_tick)
     write_record(
         output, type="event", tick=tick, name="lantern_lit",
-        data={"lantern_id": nearest["id"]},
+        data={"lantern_id": nearest["id"], "relight": relight},
     )
-    return points + tuning["score"]["per_lantern"]
+    return points + (40 if relight else tuning["score"]["per_lantern"])
+
+
+def displayed_fuel(lantern):
+    return round(lantern["fuel"] / TICKS_PER_SECOND, 1)
+
+
+def repel_shades(lantern, shades, sim_tick):
+    for shade in shades:
+        if ground_distance(shade["pos"], lantern["pos"]) < 6:
+            shade.update(state="recoil", state_until=sim_tick + 30, recoil_center=lantern["pos"],
+                         target_lantern_id=None, drain_ticks=0)
+
+
+def burn_fuel(output, tick, lanterns, shades, tuning):
+    decay = round(tuning["fuel_decay_per_s"])
+    drain = tuning["drain_per_s"]
+    for lantern in lanterns:
+        if not lantern["lit"]:
+            continue
+        lantern["fuel"] -= decay
+        draining = [shade for shade in shades if shade["state"] == "drain"
+                    and shade.get("target_lantern_id") == lantern["id"]]
+        lantern["fuel"] = max(0, lantern["fuel"] - drain * len(draining))
+        for shade in draining:
+            shade["drain_ticks"] = shade.get("drain_ticks", 0) + 1
+            if shade["drain_ticks"] % TICKS_PER_SECOND == 0:
+                write_record(output, type="event", tick=tick, name="fuel_drain",
+                             data={"lantern_id": lantern["id"], "shade_id": shade["id"], "fuel": displayed_fuel(lantern)})
+        if lantern["fuel"] == 0:
+            lantern.update(lit=False, deposited=0)
+            write_record(output, type="event", tick=tick, name="lantern_out", data={"lantern_id": lantern["id"]})
 
 
 def ground_distance(first, second):
@@ -281,39 +340,73 @@ def move_drifters(output, tick, sim_tick, player, drifters):
 def pulse_shades(output, tick, sim_tick, player, shades, tuning):
     player["carried"] -= tuning["pulse_cost"]
     stunned_ids = []
+    score = 0
     for shade in shades:
         if ground_distance(shade["pos"], player["pos"]) <= tuning["pulse_radius"]:
+            score += 15 if shade["state"] == "drain" else tuning["score"]["per_stun"]
             shade["pos"] = step_toward(shade["pos"], player["pos"], -tuning["pulse_push_m"])
             shade["state"] = "stunned"
             shade["state_until"] = sim_tick + math.ceil(tuning["pulse_stun_s"] * TICKS_PER_SECOND)
             stunned_ids.append(shade["id"])
     write_record(output, type="event", tick=tick, name="pulse", data={"stunned_ids": stunned_ids})
-    return len(stunned_ids) * tuning["score"]["per_stun"]
+    return score
 
 
 def move_shades(tick, shades, player_position, lanterns, tuning):
     radius = tuning["safe_radius"]
-    safe_centers = [lantern["pos"] for lantern in lanterns if lantern["lit"]]
+    threshold = tuning["low_fuel_threshold"] * TICKS_PER_SECOND
+    weak = [entry for entry in lanterns if entry["lit"] and entry["fuel"] < threshold]
+    unlit = [entry for entry in lanterns if not entry["lit"]]
+    by_id = {entry["id"]: entry for entry in lanterns}
+    safe_centers = [entry["pos"] for entry in lanterns if entry["lit"] and entry["fuel"] >= threshold]
     protected = any(ground_distance(center, player_position) <= radius for center in safe_centers)
     step = tuning["shade_speed"] / TICKS_PER_SECOND
     contact = False
-    for shade in shades:
-        if tick < shade["state_until"] and shade["state"] in ("spawning", "stunned", "recoil", "wander"):
-            continue
-        shade["state"] = "chase"
-
+    for shade in sorted(shades, key=lambda entry: entry["id"]):
         origin = shade["pos"]
+        mode = shade["state"]
+        if mode in ("spawning", "stunned", "recoil"):
+            if tick < shade["state_until"]:
+                center = shade.get("recoil_center") if mode == "recoil" else None
+                if center is not None:
+                    distance = ground_distance(origin, center)
+                    shade["pos"] = step_toward(origin, center, -max(0, 6-distance)/(shade["state_until"]-tick))
+                continue
+            shade.pop("recoil_center", None)
+            mode = "wander"
+        player_distance = ground_distance(origin, player_position)
+        if mode == "drain":
+            target = by_id.get(shade.get("target_lantern_id"))
+            if player_distance <= 6:
+                mode = "chase"
+            elif target in weak and ground_distance(origin, target["pos"]) <= 2:
+                continue
+            else:
+                mode = "wander"
+        if mode == "wander" and player_distance <= 6:
+            mode = "chase"
+        shade["state"] = mode
         threat = next((center for center in safe_centers if ground_distance(center, origin) <= radius), None)
         if threat is not None:
             shade["pos"] = step_toward(origin, threat, -step)
             shade["state"] = "recoil"
             continue
 
-        candidate = step_toward(origin, player_position, step)
+        target_position = player_position
+        if mode == "wander":
+            target = min(weak or unlit, key=lambda entry: (ground_distance(origin, entry["pos"]), entry["id"]),
+                         default=None)
+            if target is None:
+                continue
+            target_position = target["pos"]
+        candidate = step_toward(origin, target_position, step)
         if any(ground_distance(center, candidate) <= radius for center in safe_centers):
             shade["state"] = "recoil"
         else:
             shade["pos"] = candidate
+        if mode == "wander" and target in weak and ground_distance(shade["pos"], target_position) <= 2:
+            shade.update(state="drain", target_lantern_id=target["id"], drain_ticks=0)
+            continue
         if not protected and ground_distance(shade["pos"], player_position) <= tuning["shade_hit_radius"]:
             contact = True
     return contact
@@ -451,6 +544,7 @@ def simulation_steps(output, ticks, snapshot_every, tuning, frames, initial):
             dash = frame.get("dash", dash)
         if tick > 0 and state == "playing":
             sim_tick += 1
+            burn_fuel(output, tick, lanterns, shades, tuning)
             if wind_rng is not None:
                 if sim_tick % 1800 == 0:
                     wind_direction = wind_rng.uniform(0, 360)
@@ -500,7 +594,7 @@ def simulation_steps(output, ticks, snapshot_every, tuning, frames, initial):
                                  data={"charm_id": charm["id"], "charm_ticks": CHARM_DURATION})
             next_interact = frame.get("interact", interact)
             if next_interact and not interact:
-                score += deposit_light(output, tick, player, lanterns, tuning)
+                score += deposit_light(output, tick, sim_tick, player, lanterns, shades, tuning)
             interact = next_interact
 
             next_pulse = frame.get("pulse", pulse)
@@ -542,14 +636,16 @@ def simulation_steps(output, ticks, snapshot_every, tuning, frames, initial):
         time_left = max(0, duration - sim_tick / TICKS_PER_SECOND)
         reason = None
         if tick > 0 and state == "playing":
-            if all(lantern["lit"] for lantern in lanterns):
-                state, reason = "won", "all_lit"
-                score += math.floor(time_left) * tuning["score"]["per_second_left"]
-                score += player["flames"] * tuning["score"]["per_flame_left"]
-            elif player["flames"] == 0:
+            if player["flames"] == 0:
                 state, reason = "lost", "no_flames"
             elif time_left <= 0:
-                state, reason = "lost", "dawn"
+                lit = [entry for entry in lanterns if entry["lit"]]
+                if len(lit) >= math.ceil(tuning["win_ratio"] * len(lanterns)):
+                    state, reason = "won", "dawn_survived"
+                    score += sum(50 + entry["fuel"] // TICKS_PER_SECOND for entry in lit)
+                    score += player["flames"] * tuning["score"]["per_flame_left"]
+                else:
+                    state, reason = "lost", "dawn"
         if reason:
             write_record(
                 output, type="event", tick=tick, name="game_over",
@@ -560,14 +656,15 @@ def simulation_steps(output, ticks, snapshot_every, tuning, frames, initial):
                 type="snapshot", tick=tick, sim_tick=sim_tick, night=night,
                 wind={"active": wind is not None, "dir_deg": round(wind_direction, 3)},
                 state=state, time_left_s=time_left, score=score, player={
-                    **rounded_entity(player), "vel": velocity,
+                    **rounded_entity({key: player[key] for key in ("pos", "flames", "carried")}),
+                    "capacity": capacity(player, tuning), "vel": velocity,
                     "grounded": vertical_speed == 0 and player["pos"][1] in ground_levels(night, player["pos"][0], player["pos"][2]),
                     "invuln": max(0, hit_ready - sim_tick - 1) > 0,
                     "dash_cd_s": max(0, dash_ready - sim_tick - 1) / TICKS_PER_SECOND,
                     "pulse_cd_s": max(0, pulse_ready - sim_tick - 1) / TICKS_PER_SECOND,
                     "charm_s": max(0, charm_until - sim_tick - (sim_tick == 0)) / TICKS_PER_SECOND,
                 },
-                lanterns=[rounded_entity(lantern) for lantern in lanterns],
+                lanterns=[{**rounded_entity(entry), "fuel": displayed_fuel(entry)} for entry in lanterns],
                 shades=[rounded_entity({key: shade[key] for key in ("id", "pos", "state")})
                         for shade in shades],
                 motes_active=len(motes), motes=[
