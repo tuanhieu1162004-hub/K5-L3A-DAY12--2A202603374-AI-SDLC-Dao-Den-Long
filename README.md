@@ -14,9 +14,11 @@ Trên Windows dùng `python` thay cho `python3`. Dùng WASD để di chuyển,
 Thắp đủ 5 đèn để thắng. Hết máu hoặc hết thời gian sẽ thua. Bấm **Chơi lại**
 ở màn kết quả để bắt đầu lại.
 
-Điểm gồm 10 điểm mỗi đom đóm nhặt được, 100 điểm mỗi đèn thắp và 20 điểm
-mỗi Bóng Mực bị choáng. Game không cộng thưởng thời gian hoặc máu còn lại
-và không phạt rơi khỏi đảo. Bản chơi có mép đảo giữ người chơi trên mặt đất.
+Nhánh hiện tại áp dụng cách tính điểm Phase 2: 10 điểm mỗi đom đóm nạp,
+100 điểm mỗi đèn thắp, 5 điểm mỗi Bóng Mực trúng pulse. Khi thắng, cộng
+2 điểm cho mỗi giây nguyên còn lại và 50 điểm mỗi Ngọn Lửa còn lại.
+Dùng Esc/P để tạm dừng hoặc tiếp tục. Ra khỏi mép đảo có thể làm Mây
+mất một Ngọn Lửa và quay lại điểm xuất phát.
 
 Chạy thử headless và đối chiếu với bằng chứng nhảy đã lưu:
 
@@ -25,7 +27,10 @@ python3 src/headless.py --seed 42 --night 1 --scenario docs/proof/phase-1/empty-
 ```
 
 Xem [ghi chép Phase 1](docs/proof/phase-1/notes.md) và
-[đầu ra mẫu](docs/proof/phase-1/jump.jsonl).
+[đầu ra mẫu tại tag Phase 1](docs/proof/phase-1/jump.jsonl).
+Ở nhánh hiện tại, Contract v1.1 bổ sung trường và sự kiện so với mẫu Phase 1.
+Để chạy kiểm chứng Phase 2, dùng `python3 tests/check_phase2.py`.
+Xem [spec Phase 2](docs/phase-2-spec.md) để biết các giá trị đang dùng tạm.
 
 > **Cá nhân** (1 người / 1 MSSV) · Áp dụng SDLC cùng AI để xây một **game 3D** qua **4 phase**, từ yêu cầu ban đầu tới bản phát hành.
 > **Lab board + trợ giảng:** **[Đảo Đèn Lồng Lab](https://claude.ai/artifact/Q1RYyv1dxjUczzCbd2ZnoW)**
