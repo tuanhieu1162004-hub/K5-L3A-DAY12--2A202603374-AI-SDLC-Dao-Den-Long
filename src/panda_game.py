@@ -328,7 +328,7 @@ class LanternIsland(ShowBase):
                 active.add(key)
                 if key not in self.entities:
                     if kind == "mote":
-                        node = model(self.world,kind,[(0,.37),(.13,.49),(0,.61)],[(1,.81,.32)],6)
+                        node = model(self.world,kind,[(0,.28),(.23,.49),(0,.70)],[(1,.81,.32)],6)
                         node.setLightOff()
                     elif kind == "shade":
                         node = model(self.world,kind,[(0,-.8),(.44,-.58),(.66,.14),(.33,.65),(0,.83)],
