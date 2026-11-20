@@ -1,0 +1,12 @@
+{
+  "player": {"carried": 2},
+  "motes": [],
+  "shades": [],
+  "lanterns": [
+    {"id": "L1", "lit": true},
+    {"id": "L2", "lit": true},
+    {"id": "L3", "lit": true},
+    {"id": "L4", "lit": true},
+    {"id": "L5", "pos": [2, 0, 0], "deposited": 3}
+  ]
+}

@@ -1,5 +1,32 @@
 # Day 12 — AI SDLC: Đảo Đèn Lồng
 
+## Chạy Đêm 1 – Đảo Bến
+
+Cần Python 3.10+ có Tkinter. Trên Linux, nếu thiếu Tkinter, cài gói
+Tk của bản Python đang dùng (ví dụ `python3-tk` trên Debian/Ubuntu).
+
+```sh
+python3 src/game.py
+```
+
+Trên Windows dùng `python` thay cho `python3`. Dùng WASD để di chuyển,
+←/→ để xoay camera, Space để nhảy, E để nạp đèn và Q để tỏa sáng.
+Thắp đủ 5 đèn để thắng. Hết máu hoặc hết thời gian sẽ thua. Bấm **Chơi lại**
+ở màn kết quả để bắt đầu lại.
+
+Điểm gồm 10 điểm mỗi đom đóm nhặt được, 100 điểm mỗi đèn thắp và 20 điểm
+mỗi Bóng Mực bị choáng. Game không cộng thưởng thời gian hoặc máu còn lại
+và không phạt rơi khỏi đảo. Bản chơi có mép đảo giữ người chơi trên mặt đất.
+
+Chạy thử headless và đối chiếu với bằng chứng nhảy đã lưu:
+
+```sh
+python3 src/headless.py --seed 42 --night 1 --scenario docs/proof/phase-1/empty-arena.json --inputs docs/proof/phase-1/jump-inputs.json --ticks 50 --snapshot-every 2 --out jump.jsonl
+```
+
+Xem [ghi chép Phase 1](docs/proof/phase-1/notes.md) và
+[đầu ra mẫu](docs/proof/phase-1/jump.jsonl).
+
 > **Cá nhân** (1 người / 1 MSSV) · Áp dụng SDLC cùng AI để xây một **game 3D** qua **4 phase**, từ yêu cầu ban đầu tới bản phát hành.
 > **Lab board + trợ giảng:** **[Đảo Đèn Lồng Lab](https://claude.ai/artifact/Q1RYyv1dxjUczzCbd2ZnoW)**
 
