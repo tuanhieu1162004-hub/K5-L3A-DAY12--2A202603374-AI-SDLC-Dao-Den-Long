@@ -17,8 +17,23 @@ TONES = {
     "player_hit": (220, 150), "jump": (420, 620), "dash": (820, 530),
     "won": (523, 659, 784, 1047), "lost": (392, 330, 262),
     "shade_spawned": (130, 165), "countdown": (880,), "wind": (260, 310),
-    "ambient": (196, 294, 247),
+    "ambient": (196, 294, 247, 196, 165, 247, 220, 147),
 }
+
+
+def write_wave(path, cue, volume):
+    samples = bytearray()
+    rate = 16000
+    for tone in TONES[cue]:
+        length = 12800 if cue == "ambient" else 960
+        level = 18 if cue == "ambient" else 75
+        for index in range(length):
+            envelope = min(1, index / 80, (length - index) / 160)
+            amplitude = level * volume * envelope
+            samples.extend(struct.pack("<h", int(amplitude * math.sin(math.tau * tone * index / rate))))
+    with wave.open(str(path), "wb") as sound:
+        sound.setparams((1, 2, rate, 0, "NONE", "not compressed"))
+        sound.writeframes(samples)
 
 
 class GameAudio:
@@ -38,18 +53,7 @@ class GameAudio:
                 self.directory = tempfile.TemporaryDirectory()
             path = Path(self.directory.name) / f"{cue}-{volume}.wav"
             if not path.exists():
-                samples = bytearray()
-                rate = 16000
-                for tone in TONES[cue]:
-                    length = 3200 if cue == "ambient" else 960
-                    level = 18 if cue == "ambient" else 75
-                    for index in range(length):
-                        envelope = min(1, index / 80, (length - index) / 160)
-                        amplitude = level * volume * envelope
-                        samples.extend(struct.pack("<h", int(amplitude * math.sin(math.tau * tone * index / rate))))
-                with wave.open(str(path), "wb") as sound:
-                    sound.setparams((1, 2, rate, 0, "NONE", "not compressed"))
-                    sound.writeframes(samples)
+                write_wave(path, cue, volume)
             winsound.PlaySound(str(path), winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
         except (OSError, RuntimeError):
             pass

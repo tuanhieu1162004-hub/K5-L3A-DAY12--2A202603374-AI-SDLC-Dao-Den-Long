@@ -1,6 +1,12 @@
 # Day 12 — AI SDLC: Đảo Đèn Lồng
 
+[Video demo MP4](docs/demo/demo.mp4)
+
 ## Chạy Đêm 1 – Đảo Bến
+
+Bạn điều khiển Mây bảo vệ các đèn lồng trên đảo nổi trong ba Đêm.
+
+![Menu Panda3D nhìn toàn cảnh đảo](docs/proof/phase-4-preview.png)
 
 Cần Python 3.10+ và môi trường đồ họa hỗ trợ Panda3D.
 
@@ -21,8 +27,36 @@ Phase 3 cộng 5 điểm mỗi đom đóm nạp, 100 điểm thắp lần đầu
 thắp lại, và 5 hoặc 15 điểm mỗi Bóng Mực trúng pulse tùy trạng thái.
 Ở bình minh, mỗi đèn sáng cộng 50 điểm cộng phần nguyên nhiên liệu,
 và mỗi Ngọn Lửa còn lại cộng 50 điểm nếu thắng.
-Dùng Esc/P để tạm dừng hoặc tiếp tục. Ra khỏi mép đảo có thể làm Mây
+Dùng Esc để tạm dừng hoặc tiếp tục. Ra khỏi mép đảo có thể làm Mây
 mất một Ngọn Lửa và quay lại điểm xuất phát.
+
+Bản Panda3D dùng Esc làm phím tạm dừng mặc định. Từ menu hoặc khi
+tạm dừng, mở F1 để đổi phím, bật chữ lớn, giảm chuyển động, chỉnh âm lượng
+và độ nhạy chuột. Giữ chuột phải rồi kéo để xoay camera. Bấm L ở menu để
+xem bảng xếp hạng. Sau khi thua hoặc thắng cả ba Đêm, nhập tên để lưu điểm.
+
+## Kiểm chứng Phase 4
+
+```sh
+python3 src/bench.py --seed 42 --duration 30 --out bench.json
+python3 src/soak.py --seed 7 --nights 10 --out soak.json
+python3 src/panda_game.py --export-leaderboard scores.json
+```
+
+Benchmark dùng cửa sổ 1280×720, yêu cầu Panda3D tắt vsync và đo sau 3 giây
+khởi động. Bộ kết quả trên máy phát triển ở [bench.json](bench.json) và
+[soak.json](soak.json). Đồ họa 3D và benchmark cần một desktop đang chạy.
+
+Trên Linux dùng X11, có thể dựng và chạy bản Docker tại chỗ. Docker cần
+quyền đọc socket X11 và cookie Xauthority của phiên desktop hiện tại.
+
+```sh
+docker build -t dao-den-long:v1.0.0 .
+docker run --rm -e DISPLAY -e XAUTHORITY=/tmp/game.xauth -v /tmp/.X11-unix:/tmp/.X11-unix:ro -v "${XAUTHORITY:-$HOME/.Xauthority}:/tmp/game.xauth:ro" -v dao-den-long-data:/root dao-den-long:v1.0.0
+```
+
+Nếu có gói Docker đã xuất, nạp bằng `docker load -i dao-den-long-v1.0.0-linux-amd64.tar`
+trước khi dùng lệnh `docker run`. Volume giữ cài đặt và điểm sau khi đóng game.
 
 Chạy thử headless và đối chiếu với bằng chứng nhảy đã lưu:
 
@@ -32,7 +66,7 @@ python3 src/headless.py --seed 42 --night 1 --scenario docs/proof/phase-1/empty-
 
 Xem [ghi chép Phase 1](docs/proof/phase-1/notes.md) và
 [đầu ra mẫu tại tag Phase 1](docs/proof/phase-1/jump.jsonl).
-Contract v1.2 bổ sung trường và sự kiện so với mẫu Phase 1.
+Contract v1.3 bổ sung trường và sự kiện so với mẫu Phase 1.
 Để chạy kiểm chứng Phase 2–3, dùng `python3 tests/check_phase2.py`.
 Xem [spec Phase 2](docs/phase-2-spec.md) để biết các giá trị đang dùng tạm.
 

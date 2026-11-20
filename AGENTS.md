@@ -6,4 +6,6 @@
 - Giữ mô phỏng 60 tick/giây, seed tất định và đồng bộ tuning với game.contract.json.
 - Phase 2: dữ liệu bản đồ nằm tại `src/night_maps.py`. Dùng `--night 1|2|3` để kiểm tra từng Đêm và đối chiếu `tick` với `sim_tick` ở ca pause.
 - Ghi rõ tuning tạm trong spec cho đến khi đối chiếu được bảng chuẩn.
+- Phase 3: giữ fuel theo đơn vị 1/60 và kiểm tra thắng sau khi xử lý toàn bộ tick bình minh.
+- Phase 4: dùng `python3 tests/check_phase2.py` cho hồi quy, `src/bench.py` cho cảnh chuẩn và `src/soak.py` để đo nhiều Đêm trong một tiến trình.
 - Chạy các ca liên quan trước khi kết luận. Lưu đầu ra thật và ghi rõ ca chưa kiểm tra.

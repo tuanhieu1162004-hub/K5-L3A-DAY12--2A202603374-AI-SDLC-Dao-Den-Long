@@ -352,7 +352,7 @@ def pulse_shades(output, tick, sim_tick, player, shades, tuning):
     return score
 
 
-def move_shades(tick, shades, player_position, lanterns, tuning):
+def move_shades(tick, shades, player_position, lanterns, tuning, *, chase_enabled=True):
     radius = tuning["safe_radius"]
     threshold = tuning["low_fuel_threshold"] * TICKS_PER_SECOND
     weak = [entry for entry in lanterns if entry["lit"] and entry["fuel"] < threshold]
@@ -383,7 +383,7 @@ def move_shades(tick, shades, player_position, lanterns, tuning):
                 continue
             else:
                 mode = "wander"
-        if mode == "wander" and player_distance <= 6:
+        if mode == "wander" and chase_enabled and player_distance <= 6:
             mode = "chase"
         shade["state"] = mode
         threat = next((center for center in safe_centers if ground_distance(center, origin) <= radius), None)

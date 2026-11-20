@@ -22,7 +22,8 @@ def model(parent, name, rings, colors, sides=16):
             length = max(0.0001, (dz * dz + dr * dr) ** .5)
             normal = (cos(angle) * dz / length, sin(angle) * dz / length, dr / length)
             color = colors[layer % len(colors)]
-            shade = .91 + .09 * cos(face * 2.4)
+            contrast = .025 if dz == 0 else .09
+            shade = 1 - contrast + contrast * cos(face * 2.4)
             for radius, z, theta in ((lower_radius,lower_z,a),(lower_radius,lower_z,b),
                                       (upper_radius,upper_z,b),(upper_radius,upper_z,a)):
                 vertices.addData3(radius * cos(theta), radius * sin(theta), z)

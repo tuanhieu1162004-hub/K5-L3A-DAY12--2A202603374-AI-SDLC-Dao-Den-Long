@@ -1,5 +1,12 @@
 # Changelog
 
+## Phase 4 · Contract v1.3
+
+- Added the rendered benchmark and in-process soak commands.
+- Added a persistent local top ten, score entry at the end of a run, and JSON export.
+- Added key remapping, duplicate detection, reset to defaults, large text, reduced motion, and visual cues for countdown, wind and nearby threats.
+- Added a Docker build recipe for Linux desktop and documented the release commands.
+
 ## Phase 3 · Contract v1.2
 
 - Breaking: a night ends at dawn or when the player loses the last flame. `all_lit` is replaced by `dawn_survived` for a successful dawn.
